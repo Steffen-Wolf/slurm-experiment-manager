@@ -7,21 +7,13 @@ import configargparse
 import configparser
 import click
 
-p = configargparse.ArgParser()
-p.add('-d', '--base_dir', required=False, 
-      help='base directory for storing micron experiments``')
-p.add('-e', required=True, help='name of the experiment, e.g. fafb')
-p.add('-t', required=True, help='train number/id for this particular run')
-p.add('-r', required=True, help='script to run')
-p.add('-p', default='python', help='path to python binary')
-p.add('-l', help='path to experiment library')
-p.add('-c', required=False, action='store_true', help='clean up - remove specified train setup')
-
-def generate_slurm_script(job_name, root_dir, python_binary, run_file, **kwargs):
+def generate_slurm_script(job_name, root_dir, python_binary, run_file, arguments):
 
     # turn all kwargs into a commandline argutment string
     # in the fromat --key=value
-    arguments = " --" + " --".join([f"{k}={v}" for k,v in kwargs.items()])
+
+
+
     sbatch_script = f"""#!/bin/bash
 
 #SBATCH --job-name={job_name}
@@ -34,7 +26,7 @@ def generate_slurm_script(job_name, root_dir, python_binary, run_file, **kwargs)
 
 export PYTHONPATH=$PYTHONPATH:{root_dir}
 
-{python_binary} {run_file} {arguments}
+{python_binary} {run_file} {arguments} --default_root_dir {root_dir}
 """
 
     return sbatch_script
@@ -54,7 +46,7 @@ def set_up_experiment(base_dir,
                       experiment,
                       train_number,
                       clean_up=False,
-                      **kwargs):
+                      arguments=""):
 
     ''' Sets up the directory structure and config file for 
         training a network for microtubule prediction.
@@ -93,7 +85,7 @@ def set_up_experiment(base_dir,
         library_name = get_folder_name(code_dir)
         copytree(code_dir, os.path.join(setup_dir, library_name))
 
-        train_script = generate_slurm_script(experiment, setup_dir, python_binary, run_file, **kwargs)
+        train_script = generate_slurm_script(experiment, setup_dir, python_binary, run_file, arguments)
 
         with open(os.path.join(setup_dir, "train.sh"), "w") as f:
             f.write(train_script)
@@ -124,6 +116,17 @@ def create_run_command():
 
 
 if __name__ == "__main__":
+
+    p = configargparse.ArgParser()
+    p.add('-d', '--base_dir', required=False, 
+      help='base directory for storing micron experiments``')
+    p.add('-e', required=True, help='name of the experiment, e.g. fafb')
+    p.add('-t', required=True, help='train number/id for this particular run')
+    p.add('-r', required=True, help='script to run')
+    p.add('-p', default='python', help='path to python binary')
+    p.add('-l', help='path to experiment library')
+    p.add('-c', required=False, action='store_true', help='clean up - remove specified train setup')
+    p.add('--args', required=False, default="", help='arguments passed to the running script')
     options = p.parse_args()
 
     experiment_run_file = options.r
@@ -133,7 +136,6 @@ if __name__ == "__main__":
     code_dir = options.l
     train_number = int(options.t)
 
-
     clean_up = bool(options.c)
     set_up_experiment(base_dir,
                       python_binary,
@@ -141,4 +143,5 @@ if __name__ == "__main__":
                       experiment_run_file,
                       experiment,
                       train_number,
-                      clean_up)
+                      clean_up,
+                      options.args)
