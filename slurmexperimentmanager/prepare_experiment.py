@@ -7,22 +7,26 @@ import configargparse
 import configparser
 import click
 
-def generate_slurm_script(job_name, root_dir, python_binary, run_file, arguments):
+def generate_slurm_script(job_name, root_dir, python_binary, run_file, arguments, ngpu=1, ncpu=4):
 
     # turn all kwargs into a commandline argutment string
     # in the fromat --key=value
-
-
-
     sbatch_script = f"""#!/bin/bash
 
 #SBATCH --job-name={job_name}
 #SBATCH --nodes=1
 #SBATCH --partition gpu
-#SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task={ncpu}
+#SBATCH --gres=gpu:{ngpu}
 #SBATCH --mem=32GB
 #SBATCH --chdir={root_dir}
+
+#BSUB -q gpu_rtx
+#BSUB -o output.log
+#BSUB -n {ncpu}
+#BSUB -gpu "num={ngpu}:mps=no"
+#BSUB -J {job_name}
+#BSUB -cwd {root_dir}
 
 export PYTHONPATH=$PYTHONPATH:{root_dir}
 
@@ -30,6 +34,7 @@ export PYTHONPATH=$PYTHONPATH:{root_dir}
 """
 
     return sbatch_script
+
 
 def get_folder_name(path):
     split = os.path.split(path)
@@ -45,8 +50,13 @@ def set_up_experiment(base_dir,
                       run_file,
                       experiment,
                       train_number,
+                      experiment_chapter="01_train",
+                      run_script="train.sh",
                       clean_up=False,
-                      arguments=""):
+                      arguments="",
+                      ngpu=1,
+                      ncpu=4,
+                      exists_ok=False):
 
     ''' Sets up the directory structure and config file for 
         training a network for microtubule prediction.
@@ -62,7 +72,7 @@ def set_up_experiment(base_dir,
     '''
 
     base_dir = os.path.expanduser(base_dir)
-    setup_dir = os.path.join(base_dir, experiment, "01_train/setup_t{}".format(train_number))
+    setup_dir = os.path.join(base_dir, experiment, f"{experiment_chapter}/setup_t{train_number:04d}")
 
     if clean_up:
         if __name__ == "__main__":
@@ -80,16 +90,25 @@ def set_up_experiment(base_dir,
             except:
                 raise ValueError("Cannot create setup {}, path invalid".format(setup_dir))
         else:
-            raise ValueError("Cannot create setup {}, setup exists already.".format(setup_dir))
+            if not exists_ok:
+                raise ValueError("Cannot create setup {}, setup exists already.".format(setup_dir))
 
         library_name = get_folder_name(code_dir)
-        copytree(code_dir, os.path.join(setup_dir, library_name))
+        try:
+            copytree(code_dir, os.path.join(setup_dir, library_name))
+        except:
+            pass
 
-        train_script = generate_slurm_script(experiment, setup_dir, python_binary, run_file, arguments)
+        train_script = generate_slurm_script(experiment+f"_setup_{train_number:04d}",
+                                             setup_dir,
+                                             python_binary,
+                                             run_file,
+                                             arguments,
+                                             ngpu=ngpu,
+                                             ncpu=ncpu)
 
-        with open(os.path.join(setup_dir, "train.sh"), "w") as f:
+        with open(os.path.join(setup_dir, run_script), "w") as f:
             f.write(train_script)
-
 
 
 def create_run_command():
