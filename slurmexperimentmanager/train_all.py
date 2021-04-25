@@ -15,7 +15,6 @@ if __name__ == '__main__':
 
     args = p.parse_args()
 
-
     print(f"{args.directory}/*/{args.script}")
     for i, fn in enumerate(glob(f"{args.directory}/*/{args.script}")):
 
@@ -26,7 +25,7 @@ if __name__ == '__main__':
                                         shell=True)
             print(args.command, fn)
             print(process.stdout.read())
-            time.sleep(1)
+            time.sleep(2)
         else:
             print(args.command, fn)
 

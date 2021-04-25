@@ -30,7 +30,7 @@ def generate_slurm_script(job_name, root_dir, python_binary, run_file, arguments
 
 export PYTHONPATH=$PYTHONPATH:{root_dir}
 
-{python_binary} {run_file} {arguments} --default_root_dir {root_dir}
+{python_binary} {run_file} {arguments}
 """
 
     return sbatch_script
@@ -56,7 +56,8 @@ def set_up_experiment(base_dir,
                       arguments="",
                       ngpu=1,
                       ncpu=4,
-                      exists_ok=False):
+                      exists_ok=False
+                      ):
 
     ''' Sets up the directory structure and config file for 
         training a network for microtubule prediction.
